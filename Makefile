@@ -1,9 +1,8 @@
 .PHONY: clean
 
-JAVA_HOME=/usr/local/jdk-10.0.1
 TARGET = libjnativetracer.so
 OBJS = jnativetracer.o
-CXX = g++
+CXX ?= g++
 CXXFLAGS = -fPIC -g -std=c++11
 CPPFLAGS = -I$(JAVA_HOME)/include -I$(JAVA_HOME)/include/linux
 LDFLAGS = -lpthread
