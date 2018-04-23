@@ -25,10 +25,11 @@
 #include <stdlib.h>
 
 #include <iostream>
+#include <mutex>
 
 
-pthread_mutex_t lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-bool is_entered = false;
+std::recursive_mutex mtx;
+thread_local bool already_owned = false;
 
 jclass thread_class = NULL;
 jmethodID dump_stack = NULL;
@@ -106,19 +107,23 @@ void JNICALL OnMethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
     char *sig = NULL;
     jvmti->GetMethodName(method, &name, &sig, NULL);
 
-    pthread_mutex_lock(&lock);
     {
-      if(!is_entered){
-        is_entered = true;
-        std::cout << "jnativetracer: native method called: " << name << sig << std::endl;
+      std::lock_guard<std::recursive_mutex> lock(mtx);
+
+      if(!already_owned){
+        already_owned = true;
+        std::cout << "jnativetracer: native method called: "
+                                         << name << sig << std::endl;
+
         if(is_dump_stack){
           jni->CallStaticVoidMethod(thread_class, dump_stack);
         }
+
         std::cout << std::endl;
-        is_entered = false;
+        already_owned = false;
       }
+
     }
-    pthread_mutex_unlock(&lock);
 
     jvmti->Deallocate((unsigned char *)name);
     jvmti->Deallocate((unsigned char *)sig);
