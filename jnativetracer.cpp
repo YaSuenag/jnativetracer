@@ -20,12 +20,9 @@
 #include <jvmti.h>
 #include <jni.h>
 
-#include <pthread.h>
-#include <string.h>
-#include <stdlib.h>
-
 #include <iostream>
 #include <mutex>
+#include <cstring>
 
 
 std::recursive_mutex mtx;
@@ -259,7 +256,7 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved){
   }
 
   jvmtiEnv *jvmti;
-  vm->GetEnv((void **)&jvmti, JVMTI_VERSION_1);
+  vm->GetEnv(reinterpret_cast<void **>(&jvmti), JVMTI_VERSION_1);
 
   jvmtiEventCallbacks callbacks = {0};
   callbacks.VMInit = &OnVMInit;
