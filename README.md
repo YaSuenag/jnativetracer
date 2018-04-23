@@ -21,18 +21,17 @@ Pass `-agentpath:/path/to/libjnativetracer.so` to `java`.
     * Dump stack traces in each native calls.
 * `trigger=<class>::<field>`
     * Set trigger field. Field should be `boolean` type. If this field set to `true`, jnativetracer starts tracing all native calls, and this field set to `false`, jnativetracer stops tracing.
+* `global=false`
+    * Show native call info in `trigger` thread only.
+    * This option affects when `trigger` is set.
 
 # Example
 
 ```
 $ cd example
 $ javac SystemGC.java
-$ java -agentpath:/path/to/libjnativetracer.so=dumpstack=true,trigger=SystemGC::isTrace SystemGC
+$ java -agentpath:/path/to/libjnativetracer.so=global=false,dumpstack=true,trigger=SystemGC::isTrace SystemGC
 ```
-
-# TODO
-
-`FieldModification` JVMTI event might be called in multi-threaded, but jnativetracer is not considered yet. `FieldModification` and `MethodEntry` should check `jthread` value or TID.
 
 # License
 

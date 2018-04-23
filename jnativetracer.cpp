@@ -30,12 +30,14 @@
 
 std::recursive_mutex mtx;
 thread_local bool already_owned = false;
+thread_local jint interest_thread_hash = -1;
 
 jclass thread_class = NULL;
 jmethodID dump_stack = NULL;
 bool is_dump_stack = false;
 char *target_class_name = NULL;
 char *target_field_name = NULL;
+bool is_global = true;
 
 
 static bool SetupTrigger(jvmtiEnv *jvmti, JNIEnv *jni){
@@ -103,6 +105,17 @@ void JNICALL OnMethodEntry(jvmtiEnv *jvmti, JNIEnv *jni,
   jvmti->IsMethodNative(method, &is_native);
 
   if(is_native){
+
+    if(!is_global){
+      jint current_thread_hash;
+      jvmti->GetObjectHashCode(thread, &current_thread_hash);
+
+      if(current_thread_hash != interest_thread_hash){
+        return;
+      }
+
+    }
+
     char *name = NULL;
     char *sig = NULL;
     jvmti->GetMethodName(method, &name, &sig, NULL);
@@ -136,7 +149,20 @@ void JNICALL OnFieldModification(jvmtiEnv *jvmti, JNIEnv *jni, jthread thread,
                                  jclass field_klass, jobject object,
                                  jfieldID field, char signature_type,
                                  jvalue new_value){
-  jvmtiEventMode mode = new_value.z ? JVMTI_ENABLE : JVMTI_DISABLE;
+  jvmtiEventMode mode;
+  if(new_value.z){
+
+    if(!is_global){
+      jvmti->GetObjectHashCode(thread, &interest_thread_hash);
+    }
+
+    mode = JVMTI_ENABLE;
+  }
+  else{
+    interest_thread_hash = -1;
+    mode = JVMTI_DISABLE;
+  }
+
   jvmti->SetEventNotificationMode(mode, JVMTI_EVENT_METHOD_ENTRY, NULL);
 }
 
@@ -199,6 +225,15 @@ static bool parse_options(char *option_str){
       target_class_name = strdup(key);
       target_field_name = strdup(value);
     }
+    else if(strcmp(key, "global") == 0){
+      if(strcmp(value, "false") == 0){
+        is_global = false;
+      }
+      else if(strcmp(value, "true") != 0){
+        std::cerr << "Unknown global value: " << value << std::endl;
+        return false;
+      }
+    }
     else{
       std::cerr << "Unknown configuration: " << key << std::endl;
       return false;
@@ -215,6 +250,12 @@ JNIEXPORT jint JNICALL Agent_OnLoad(JavaVM *vm, char *options, void *reserved){
     if(!parse_options(options)){
       return JNI_ERR;
     }
+  }
+
+  if(!is_global && (target_class_name == NULL)){
+    std::cerr << "jnativetracer: global sets to false even though trigger is not set."
+              << " global option turns on automatically." << std::endl;
+    is_global = true;
   }
 
   jvmtiEnv *jvmti;
